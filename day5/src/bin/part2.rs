@@ -1,39 +1,57 @@
+// use rayon::iter::IntoParallelRefMutIterator;
+use rayon::prelude::*;
+
 fn main() {
     let input = std::fs::read_to_string("input.txt").unwrap();
-//     let input = r#"seeds: 79 14 55 13
-//
-// seed-to-soil map:
-// 50 98 2
-// 52 50 48
-//
-// soil-to-fertilizer map:
-// 0 15 37
-// 37 52 2
-// 39 0 15
-//
-// fertilizer-to-water map:
-// 49 53 8
-// 0 11 42
-// 42 0 7
-// 57 7 4
-//
-// water-to-light map:
-// 88 18 7
-// 18 25 70
-//
-// light-to-temperature map:
-// 45 77 23
-// 81 45 19
-// 68 64 13
-//
-// temperature-to-humidity map:
-// 0 69 1
-// 1 0 69
-//
-// humidity-to-location map:
-// 60 56 37
-// 56 93 4"#;
+    //     let input = r#"seeds: 79 14 55 13
+    //
+    // seed-to-soil map:
+    // 50 98 2
+    // 52 50 48
+    //
+    // soil-to-fertilizer map:
+    // 0 15 37
+    // 37 52 2
+    // 39 0 15
+    //
+    // fertilizer-to-water map:
+    // 49 53 8
+    // 0 11 42
+    // 42 0 7
+    // 57 7 4
+    //
+    // water-to-light map:
+    // 88 18 7
+    // 18 25 70
+    //
+    // light-to-temperature map:
+    // 45 77 23
+    // 81 45 19
+    // 68 64 13
+    //
+    // temperature-to-humidity map:
+    // 0 69 1
+    // 1 0 69
+    //
+    // humidity-to-location map:
+    // 60 56 37
+    // 56 93 4"#;
     println!("Part 1: {:?}", solution(&input));
+}
+
+#[derive(Debug)]
+struct Seed {
+    start: usize,
+    range: usize,
+}
+
+impl Seed {
+    fn new(input: &[usize]) -> Seed {
+        Seed {
+            start: input[0],
+            range: input[1],
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -47,7 +65,6 @@ impl Map {
     fn new(input: &str) -> Map {
         let nums: Vec<usize> = input
             .split_whitespace()
-            .inspect(|x| println!("INspect: {:?}", x))
             .map(|x| x.parse().unwrap())
             .collect();
         Map {
@@ -59,7 +76,6 @@ impl Map {
 
     fn find_location(&self, seed: usize) -> Option<usize> {
         if seed >= self.source && seed <= self.source + self.range - 1 {
-            println!("Seed: {} source: {}", seed, self.source);
             let length_between = seed - self.source;
             return Some(self.destination + length_between);
         }
@@ -71,11 +87,16 @@ fn solution(input: &str) -> usize {
         .split("\n\n")
         .flat_map(|x| x.split(":").skip(1).map(|x| x.trim_start()))
         .collect();
-    println!("This is the maps: {:?}", maps);
 
-    let seeds: Vec<usize> = maps[0]
+    let seeds_vec: Vec<usize> = maps[0]
         .split_whitespace()
         .map(|x| x.parse().unwrap())
+        .collect();
+
+    let seeds: Vec<usize> = seeds_vec
+        .windows(2)
+        .step_by(2)
+        .flat_map(|x| x[0]..(x[0] + x[1]))
         .collect();
 
     let mut locations: Vec<usize> = seeds.clone();
@@ -97,8 +118,7 @@ fn solution(input: &str) -> usize {
     all_maps.push(&hl_map);
 
     for map in all_maps.into_iter() {
-        println!("this is the map: {:?}", map);
-        for seed in locations.iter_mut() {
+        locations.par_iter_mut().for_each(|seed| {
             let conversions: Vec<Option<usize>> = map
                 .into_iter()
                 .map(|x| x.find_location(seed.clone()))
@@ -109,11 +129,9 @@ fn solution(input: &str) -> usize {
             }) {
                 *seed = matched.unwrap();
             }
-        }
-        println!("Locations: {:?}", locations);
+        })
     }
 
-    println!("Locations: {:?}", locations);
     locations.into_iter().min().unwrap()
 }
 
@@ -159,6 +177,6 @@ humidity-to-location map:
 60 56 37
 56 93 4"#;
 
-        assert_eq!(35, solution(input));
+        assert_eq!(46, solution(input));
     }
 }
